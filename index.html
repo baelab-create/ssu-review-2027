@@ -1,0 +1,55 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer"><title>교원채용 심사자료</title>
+<meta property="og:type" content="website"><meta property="og:title" content="숭실대학교 교원채용 심사자료"><meta property="og:description" content="심사위원 전용 · 공유받은 비밀번호를 입력하면 열립니다."><meta property="og:url" content="https://baelab-create.github.io/ssu-review-2027/"><meta property="og:image" content="https://baelab-create.github.io/ssu-review-2027/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">
+<style>
+:root{--bg:#e9edf2;--ink:#25364b;--muted:#5e6d80;--blue:#2561b7;--up:9px 9px 20px #cbd2db,-9px -9px 20px #fff;--in:inset 4px 4px 8px #ccd3dd,inset -4px -4px 8px #fff}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--ink);font:16px/1.6 'Pretendard','Malgun Gothic','Apple SD Gothic Neo',sans-serif;padding:16px}
+form{width:100%;max-width:380px;border-radius:24px;box-shadow:var(--up);padding:34px 30px;text-align:center}
+h1{font-size:21px;margin:0 0 6px;letter-spacing:-.5px}p{margin:0 0 22px;color:var(--muted);font-size:14px}
+input[type=password]{width:100%;border:0;border-radius:14px;box-shadow:var(--in);background:var(--bg);padding:14px 16px;font:inherit;font-size:18px;text-align:center;letter-spacing:3px;color:var(--ink)}
+input:focus-visible,button:focus-visible{outline:3px solid var(--blue);outline-offset:3px}
+label{display:flex;gap:8px;align-items:center;justify-content:center;margin:16px 0 0;font-size:14px;color:var(--muted)}
+button{width:100%;margin-top:18px;border:0;border-radius:14px;padding:13px;background:var(--blue);color:#fff;font:inherit;font-weight:650;cursor:pointer;box-shadow:3px 4px 9px #c3cbd7}
+button:disabled{opacity:.6;cursor:wait}#msg{min-height:22px;margin:14px 0 0;font-size:14px;color:#b3261e}
+</style></head><body>
+<form id="f" autocomplete="off"><h1>교원채용 심사자료</h1><p>공유받은 비밀번호를 입력해 주세요.</p>
+<input id="pw" type="password" aria-label="비밀번호" autofocus required>
+<label><input id="keep" type="checkbox"> 이 기기에서 비밀번호 기억</label>
+<button id="go">열기</button><div id="msg" role="alert"></div></form>
+<script>
+(function(){
+const SK='viewer-dek-v1',$=id=>document.getElementById(id),msg=t=>{$('msg').textContent=t};
+const b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+const toB64=u=>btoa(String.fromCharCode(...new Uint8Array(u)));
+const store=k=>{try{return window[k]}catch(e){return null}};
+async function derive(pw,meta){
+  const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
+  const kek=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64(meta.salt),iterations:meta.iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['decrypt']);
+  return crypto.subtle.decrypt({name:'AES-GCM',iv:b64(meta.iv)},kek,b64(meta.wrapped));
+}
+async function launch(raw){
+  const key=await crypto.subtle.importKey('raw',raw,'AES-GCM',false,['decrypt']);
+  const r=await fetch('data/app.enc?v='+Date.now());if(!r.ok)throw new Error('load');
+  const buf=await r.arrayBuffer();
+  const gz=await crypto.subtle.decrypt({name:'AES-GCM',iv:buf.slice(0,12)},key,buf.slice(12));
+  const html=await new Response(new Blob([gz]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+  window.__DEK=key;document.open();document.write(html);document.close();
+}
+async function getMeta(){const r=await fetch('data/key.json?v='+Date.now());if(!r.ok)throw new Error('load');return r.json()}
+async function resume(){
+  for(const k of ['sessionStorage','localStorage']){const s=store(k);let v=null;try{v=s&&s.getItem(SK)}catch(e){}
+    if(v){try{const o=JSON.parse(v),meta=await getMeta();if(o.id===meta.wrapped){await launch(b64(o.k));return true}}catch(e){}try{s.removeItem(SK)}catch(e){}}}
+  return false;
+}
+$('f').addEventListener('submit',async e=>{
+  e.preventDefault();msg('');$('go').disabled=true;$('go').textContent='확인 중…';
+  let raw,meta;
+  try{meta=await getMeta();raw=await derive($('pw').value.trim(),meta)}
+  catch(err){msg(err.message==='load'?'자료를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.':'비밀번호가 맞지 않습니다.');$('go').disabled=false;$('go').textContent='열기';$('pw').select();return}
+  const v=JSON.stringify({id:meta.wrapped,k:toB64(raw)});
+  try{sessionStorage.setItem(SK,v);if($('keep').checked)localStorage.setItem(SK,v)}catch(e){}
+  try{await launch(raw)}catch(err){msg('자료를 여는 중 문제가 생겼습니다. 브라우저를 최신 버전으로 업데이트해 주세요.');$('go').disabled=false;$('go').textContent='열기'}
+});
+if(!window.crypto||!crypto.subtle||!window.DecompressionStream)msg('이 브라우저에서는 열 수 없습니다. 최신 Chrome·Safari·Edge를 이용해 주세요.');
+else resume();
+})();
+</script></body></html>
